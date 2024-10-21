@@ -1,18 +1,16 @@
-#include <Arduino.h>
+#include "./communication/communication.h"
 
-// put function declarations here:
-int myFunction(int, int);
+HomeCommunication homeCom;
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    // Initialize home system configuration
+    Serial.begin(9600);
+    while (!Serial);          // Wait until Serial is ready
+
+    homeCom.setupCommunication();
+    Serial.println("Home system ready to send messages.");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    homeCom.sendMessage();
 }
