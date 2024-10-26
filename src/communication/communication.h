@@ -3,13 +3,15 @@
 
 #include <SPI.h>      // Library for SPI communication required for the LoRa module
 #include <LoRa.h>     // LoRa library enabling communication with the LoRa module
+#include <Arduino.h>
 
 class HomeCommunication {
-    int messageCount;  // Message counter
 public:
     HomeCommunication();  // Constructor
     void setupCommunication();  // Initialize LoRa communication
-    void sendMessage();  // Send a message to the external system
+    void checkForAcknowledgment(bool &isWaitingForAck);
+    void checkButtonsAndSendMessage();  // Check button presses and send corresponding messages
+    void sendMessage(String message);  // Send a message to the external system
     String receiveResponse();  // Receive confirmation/failure from the external system
 };
 
