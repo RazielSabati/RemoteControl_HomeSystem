@@ -5,40 +5,28 @@
 
 class DisplayMenu {
   private:
-       // תפריט ראשי
-    const char* items[6] = {
-      "Test scenario",
-      "Read battery percentage",
-      "Turn off system (S.M)",
-      "Scenario 1",
-      "Scenario 2",
-      "Manual control"
-    };
-
-    const char* manualControlItems[6] = {
-      "Turn on LED",
-      "Turn off LED",
-      "Turn on voice",
-      "Turn off voice",
-      "Turn on heat",
-      "Turn off heat"
+    // matrix of menu items
+    const char* namesMatrix[2][6] = {
+      { "Test scenario", "Read battery percentage", "Turn off system (S.M)", "Scenario 1", "Scenario 2", "Manual control" },
+      { "Turn on LED", "Turn off LED", "Turn on voice", "Turn off voice", "Turn on heat", "Turn off heat" }
     };
     
-    int numItems  = 6;
+    int numItems = 6;
     int currentIndex;
-    bool isManualControl;  // משתנה למעקב אחרי איזה תפריט פעיל
+    bool isManualControl;  // true if we are in manual control menu
 
   public:
-   DisplayMenu(); // הגדרת הבנאי
+    DisplayMenu(); // Constructor
 
     void display();
     void moveUp();
     void moveDown();
     const char* getCurrentSelection();
-    void enterManualControl(); // מעבר לתפריט הידני
-    bool isInManualControl();   // בודק האם אנחנו בתפריט הידני
-    void moveBackTOMenue();     // חזרה לתפריט הראשי
-
+    const char* getData(int externalIndex , int internalIndex);
+    const int getCurrentIndex();
+    void enterManualControl(); 
+    bool isInManualControl();   
+    void moveBackToMenu();      
 };
 
 #endif // DISPLAYMENU_H

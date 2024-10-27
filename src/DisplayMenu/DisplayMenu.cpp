@@ -2,29 +2,20 @@
 
 DisplayMenu::DisplayMenu() {
   this->currentIndex = 0;
-  this->isManualControl = false;  // מתחילים בתפריט הראשי
+  this->isManualControl = false;  //  start from the main menu
 }
 
 void DisplayMenu::display() {
   Serial.println("---------------");
-  if (isManualControl) {
-    for (int i = 0; i < numItems; i++) {
-      if (i == currentIndex) {
-        Serial.print("> ");
-      } else {
-        Serial.print("  ");
-      }
-      Serial.println(manualControlItems[i]);
+  int menuType = isManualControl ? 1 : 0;
+  
+  for (int i = 0; i < numItems; i++) {
+    if (i == currentIndex) {
+      Serial.print("> ");
+    } else {
+      Serial.print("  ");
     }
-  } else {
-    for (int i = 0; i < numItems; i++) {
-      if (i == currentIndex) {
-        Serial.print("> ");
-      } else {
-        Serial.print("  ");
-      }
-      Serial.println(items[i]);
-    }
+    Serial.println(namesMatrix[menuType][i]);
   }
   Serial.println("---------------");
 }
@@ -46,15 +37,21 @@ void DisplayMenu::moveDown() {
 }
 
 const char* DisplayMenu::getCurrentSelection() {
-  if (isManualControl) {
-    return manualControlItems[currentIndex];
-  }
-  return items[currentIndex];
+  int menuType = isManualControl ? 1 : 0;
+  return namesMatrix[menuType][currentIndex];
+}
+
+const char* DisplayMenu::getData(int externalIndex   , int internalIndex) {
+  return namesMatrix[externalIndex][internalIndex];
+}
+
+const int DisplayMenu::getCurrentIndex() {
+  return this->currentIndex;
 }
 
 void DisplayMenu::enterManualControl() {
   isManualControl = true;
-  currentIndex = 0; // מתחילים מהפריט הראשון בתפריט הידני
+  currentIndex = 0; // start from the first item in the manual control menu
   display();
 }
 
@@ -62,8 +59,8 @@ bool DisplayMenu::isInManualControl() {
   return isManualControl;
 }
 
-void DisplayMenu::moveBackTOMenue() {
-  isManualControl = false; // חוזרים לתפריט הראשי
-  currentIndex = 0;        // אפשר להתחיל שוב מהפריט הראשון בתפריט הראשי
+void DisplayMenu::moveBackToMenu() {
+  isManualControl = false; // back to the main menu
+  currentIndex = 0;        // start from the first item in the main menu
   display();
 }

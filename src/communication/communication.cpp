@@ -17,30 +17,35 @@ void HomeCommunication::setupCommunication() {
 }
 
 
-void HomeCommunication::sendMessage(String message) {
+void HomeCommunication::sendMessage(String message , DisplayMenu menu ,int menuType , int actionIndex ) {
+    last_request = message;
+
     Serial.print("Sending message: ");
+    Serial.println(menu.getData(menuType, actionIndex));
     Serial.println(message);
+
 
     LoRa.beginPacket();       
     LoRa.print(message);     
-    LoRa.endPacket();         
-    delay(1000);              
-
+    LoRa.endPacket();                    
 }
 
 
 void HomeCommunication::checkForAcknowledgment(bool &isWaitingForAck) {
-        int packetSize = LoRa.parsePacket();  // בדיקת קבלת הודעה חדשה
+        int packetSize = LoRa.parsePacket();  // read packets
         if (packetSize) {
             String receivedMessage = "";
             while (LoRa.available()) {
-                receivedMessage += (char)LoRa.read();  // קריאת ההודעה שהתקבלה
+                receivedMessage += (char)LoRa.read();  // read the incoming message
             }
 
-            // בדיקה אם ההודעה היא אישור (ACK)
-            if (receivedMessage == "ACK") {
+            Serial.println("Received message: " + receivedMessage);
+            
+            last_request = "ACK" + last_request;
+            // Check if the received message is an acknowledgment
+            if (receivedMessage == last_request){
                 Serial.println("Acknowledgment received.");
-                isWaitingForAck = false;  // קיבלנו אישור, אין צורך להמתין יותר
+                isWaitingForAck = false;  // Stop waiting for acknowledgment
             }
         }
 }
