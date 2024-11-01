@@ -2,68 +2,119 @@
 #include "./Buttons/Buttons.h"
 #include "./DisplayMenu/DisplayMenu.h"
 
+// הצהרה לפונקציה listenForAcknowledgment
+void listenForAcknowledgment(void *parameter);
+
 HomeCommunication loraCommunication;
 Buttons buttons(32, 33, 25, 27);
 DisplayMenu menu;
 
-bool isWaitingForAck = false;  // is waiting for acknowledgment
+bool isWaitingForAck = false; // משתנה גלובלי
 unsigned long waitStartTime = 0;
-const unsigned long ackTimeout = 10000;  // 10 seconds wait for acknowledgment
+const unsigned long ACK_TIMEOUT = 10000;       // 10 second timeout
+TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
 
 void setup() {
-    // Initialize home system configuration
     Serial.begin(9600);
-    while (!Serial);          // Wait until Serial is ready
-
-    loraCommunication.setupCommunication();
+    
+    // Wait for serial with timeout
+    unsigned long serialStart = millis();
+    while (!Serial && millis() - serialStart < 5000);
+    
+    if (!loraCommunication.setupCommunication()) {
+        Serial.println(F("Failed to initialize LoRa! Halting."));
+        while (1) {
+            delay(1000);
+        }
+    }
+    
     buttons.setupButtons();
-    menu.display();
+    menu.setupScreen();
 
-
-    Serial.println("Home system ready to send messages.");
+    Serial.println(F("Home system ready."));
 }
 
 void loop() {
-    if (isWaitingForAck) {
-        loraCommunication.checkForAcknowledgment(isWaitingForAck);
-    }
+    unsigned long currentMillis = millis();
 
-    if (isWaitingForAck && (millis() - waitStartTime > ackTimeout)) {
-        Serial.println("Timeout: No acknowledgment received.");
+    // Check for timeout on waiting ACK
+    if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
+        Serial.println(F("Acknowledgment timeout"));
         isWaitingForAck = false;
+
+        // Delete the task if it was created (to free the core)
+        if (ackTaskHandle != NULL) {
+            vTaskDelete(ackTaskHandle);
+            ackTaskHandle = NULL;
+        }
     }
+    
+    // Button handling with debounce
+    static unsigned long lastButtonPress = 0;
+    const unsigned long DEBOUNCE_DELAY = 200;
+    
+    if (currentMillis - lastButtonPress >= DEBOUNCE_DELAY) {
+        if (buttons.isUpPressed()) {
+            menu.moveUp();
+            lastButtonPress = currentMillis;
+        }
+        
+        if (buttons.isDownPressed()) {
+            menu.moveDown();
+            lastButtonPress = currentMillis;
+        }
+        
+        if (buttons.isBackPressed() && menu.isInManualControl()) {
+            menu.moveBackToMenu();
+            lastButtonPress = currentMillis;
+        }
+        
+        if (buttons.isSelectPressed()) {
+            if (strcmp(menu.getCurrentSelection(), "manual control") == 0) {
+                menu.enterManualControl();
+            }
+             else if (!isWaitingForAck) {
+                int menuType = menu.isInManualControl() ? 2 : 1;
+                int actionIndex = menu.getCurrentIndex();
+                int commandCode = menuType * 10 + actionIndex;
 
-    if (buttons.isUpPressed()) {
-        menu.moveUp();
-        delay(200);  // avoid bouncing
+                // Send the message and start waiting for an ACK
+                if (loraCommunication.sendMessage(String(commandCode), menu, menuType - 1, actionIndex)) {
+                    isWaitingForAck = true;
+                    waitStartTime = currentMillis;
+
+                    // Create the acknowledgment task only when waiting for an ACK
+                    xTaskCreatePinnedToCore(
+                        listenForAcknowledgment, // Task function
+                        "ListenForAck",          // Task name
+                        10000,                   // Stack size
+                        NULL,                    // Parameters
+                        1,                       // Priority
+                        &ackTaskHandle,          // Task handle
+                        0                        // Core to pin the task
+                    );
+                }
+            }
+            lastButtonPress = currentMillis;
+        }
     }
+}
 
-    if (buttons.isDownPressed()) {
-        menu.moveDown();
-        delay(200);  // avoid bouncing
+// Task to listen for acknowledgment messages (runs on core 0)
+void listenForAcknowledgment(void *parameter) {
+    while (isWaitingForAck) {  // Run only if still waiting for ACK
+        if (loraCommunication.checkForAcknowledgment(isWaitingForAck, menu)) {
+            Serial.println(F("Acknowledgment received in task"));
+            isWaitingForAck = false;
+
+            // Delete the task once acknowledgment is received
+            if (ackTaskHandle != NULL) {
+                vTaskDelete(ackTaskHandle);
+                ackTaskHandle = NULL;
+            }
+            break; // Exit the loop after acknowledgment is handled
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay to prevent overloading
     }
-
-    if (buttons.isBackPressed() && menu.isInManualControl() ) {
-        menu.moveBackToMenu();
-        delay(200);  // avoid bouncing
-    }
-
-    if (buttons.isSelectPressed() && strcmp(menu.getCurrentSelection(), "Manual control") == 0) {
-        menu.enterManualControl();
-        delay(200);  // avoid bouncing
-        return;
-    }
-
-    // Check if the select button is pressed and send the selected message
-    if (!isWaitingForAck && buttons.isSelectPressed()) {
-        int menuType = menu.isInManualControl() ? 2 : 1;  // 1 for main menu, 2 for manual control menu
-        int actionIndex = menu.getCurrentIndex();          // get the selected action index
-        int commandCode = menuType * 10 + actionIndex;     // create a command code
-
-        loraCommunication.sendMessage(String(commandCode) , menu , menuType -1 , actionIndex ); // send the selected message
-        isWaitingForAck = true;
-        waitStartTime = millis();
-        delay(500);  // avoid bouncing
-    }
-
+    vTaskDelete(NULL); // Delete the current task
 }
