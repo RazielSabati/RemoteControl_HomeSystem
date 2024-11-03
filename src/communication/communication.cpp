@@ -25,53 +25,77 @@ bool HomeCommunication::setupCommunication() {
     return true;
 }
 
-bool HomeCommunication::sendMessage(const String& message, DisplayMenu& menu, int menuType, int actionIndex) {
-        if (message.length() >= MAX_MESSAGE_LENGTH) {
-            Serial.println(F("Message too long!"));
-            return false;
-        }
-        
-        last_request_code = message;
+bool HomeCommunication::sendMessage(DisplayMenu& menu, int menuType, int actionIndex) {
+        last_request_code = menuType * 10 + actionIndex;;
         last_request = menu.getData(menuType, actionIndex);
         
         Serial.print(F("Sending message: "));
         Serial.println(last_request);
         
-        LoRa.beginPacket();
-        LoRa.print(message);
-        bool success = LoRa.endPacket();
-        
-        if (!success) {
-            Serial.println(F("Failed to send message"));
-            return false;
-        }
-        
-        delay(10); // Short delay for stability
-        return true;
+         // Input validation
+    if (menuType < 0 || menuType > 1 || actionIndex < 0 || actionIndex > 5) {
+        Serial.println(F("Invalid input values!"));
+        return false;
     }
+
+    
+    // Create message byte
+    // First bit is menuType (0 or 1)
+    // Next 3 bits are actionIndex (0-5)
+    // Last 4 bits are error check
+    uint8_t messageByte = (menuType & 0x01) << 7;    // Put menuType in most significant bit
+    messageByte |= (actionIndex & 0x07) << 4;        // Put actionIndex in next 3 bits
+    
+    // Create error check using the first 4 bits
+    uint8_t errorCheck = ((messageByte >> 4) & 0x0F);
+    errorCheck = errorCheck ^ ERROR_CHECK_MASK;       // XOR with mask for error checking
+    messageByte |= errorCheck & 0x0F;                // Add error check in least significant 4 bits
+    
+
+
+    last_request_uint8_t = messageByte;
+
+
+
+    // Debug print
+    Serial.print(F("Sending byte: 0b"));
+    for (int i = 7; i >= 0; i--) {
+        Serial.print((messageByte >> i) & 0x01);
+    }
+    Serial.println();
+
+    // Send using LoRa
+    LoRa.beginPacket();
+    LoRa.write(messageByte);  // Send single byte
+    bool success = LoRa.endPacket();
+    
+    if (!success) {
+        Serial.println(F("Failed to send message"));
+        return false;
+    }
+    
+    delay(10);  // Short delay for stability
+    return true;
+}
 
 bool HomeCommunication::checkForAcknowledgment(bool& isWaitingForAck, DisplayMenu& menu) { 
         int packetSize = LoRa.parsePacket();
-        if (packetSize == 0) 
-            return false;
-        
-        
-        // Clear buffer
-        memset(receive_buffer, 0, MAX_MESSAGE_LENGTH);
-        
-        // Read message with bounds checking
-        size_t i = 0;
-        while (LoRa.available() && i < MAX_MESSAGE_LENGTH - 1) {
-            receive_buffer[i++] = (char)LoRa.read();
+       
+        // Check if we received exactly one byte (8 bits)
+        if (packetSize != 1) {
+            // Serial.println(F("Invalid packet size received."));
+            return false;  // Exit the function if packet size is not exactly 1 byte
         }
-        receive_buffer[i] = '\0';
 
-        
-        String receivedMessage = String(receive_buffer);
-        
-        Serial.println(receivedMessage);
+        uint8_t receivedByte = LoRa.read();  // Read the single byte message
 
-        if (receivedMessage == last_request_code) {
+        Serial.print(F("Received byte: 0b"));
+        for (int i = 7; i >= 0; i--) {
+            Serial.print((receivedByte >> i) & 0x01);
+        }
+        Serial.println();
+
+        if (receivedByte == last_request_uint8_t) {
             Serial.println(F("Acknowledgment received"));
             isWaitingForAck = false;
             retry_count = 0;
@@ -82,3 +106,5 @@ bool HomeCommunication::checkForAcknowledgment(bool& isWaitingForAck, DisplayMen
         else
             return false;
 }
+
+

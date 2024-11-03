@@ -74,12 +74,11 @@ void loop() {
                 menu.enterManualControl();
             }
              else if (!isWaitingForAck) {
-                int menuType = menu.isInManualControl() ? 2 : 1;
+                int menuType = menu.isInManualControl() ? 1 : 0;
                 int actionIndex = menu.getCurrentIndex();
-                int commandCode = menuType * 10 + actionIndex;
 
                 // Send the message and start waiting for an ACK
-                if (loraCommunication.sendMessage(String(commandCode), menu, menuType - 1, actionIndex)) {
+                if (loraCommunication.sendMessage( menu, menuType , actionIndex)) {
                     isWaitingForAck = true;
                     waitStartTime = currentMillis;
 

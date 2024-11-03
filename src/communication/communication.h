@@ -8,14 +8,16 @@
 
 class HomeCommunication {
 private:
-    String last_request_code;
+    int last_request_code;
     String last_request;
+    uint8_t last_request_uint8_t;
+
     DisplayMenu menu;
 
     const unsigned long RETRY_INTERVAL = 1000; // Time between retries in ms
     const uint8_t MAX_RETRIES = 5;            // Maximum number of retries
     uint8_t retry_count;
-    
+    const uint8_t ERROR_CHECK_MASK = 0x0F;
     
     // Pin definitions
     static const uint8_t LORA_SS_PIN = 5;
@@ -31,7 +33,7 @@ public:
 
     bool setupCommunication();  // Initialize LoRa communication
     bool checkForAcknowledgment(bool& isWaitingForAck, DisplayMenu& menu);
-    bool sendMessage(const String& message, DisplayMenu& menu, int menuType, int actionIndex );  // Send a message to the external system
+    bool sendMessage( DisplayMenu& menu, int menuType, int actionIndex );  // Send a message to the external system
 };
 
 #endif
