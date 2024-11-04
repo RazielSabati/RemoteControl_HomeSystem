@@ -11,7 +11,7 @@ DisplayMenu menu;
 
 bool isWaitingForAck = false; // משתנה גלובלי
 unsigned long waitStartTime = 0;
-const unsigned long ACK_TIMEOUT = 10000;       // 10 second timeout
+const unsigned long ACK_TIMEOUT = 18000;       // 10 second timeout
 TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
 
 void setup() {
@@ -40,6 +40,7 @@ void loop() {
     // Check for timeout on waiting ACK
     if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
         Serial.println(F("Acknowledgment timeout"));
+        menu.displayConfirmationMessage("Timeout, Please try again.");
         isWaitingForAck = false;
 
         // Delete the task if it was created (to free the core)

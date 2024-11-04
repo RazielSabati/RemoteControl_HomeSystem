@@ -14,12 +14,12 @@ bool HomeCommunication::setupCommunication() {
     }
     
    // הגדרות למרחק מקסימלי
-    LoRa.setSpreadingFactor(12); //שידור איטי יותר, אך החוסן והטווח גדלים
-    LoRa.setSignalBandwidth(31.25E3); // רוחב פס מאוזן יותר
-    LoRa.setCodingRate4(8);
-    LoRa.setPreambleLength(8);        // אורך preamble סטנדרטי
+    LoRa.setSpreadingFactor(12);
+    LoRa.setSignalBandwidth(62.5E3);
+    LoRa.setCodingRate4(5);
+    LoRa.setPreambleLength(8);
     LoRa.setTxPower(20);
-    LoRa.enableCrc();
+    // LoRa.enableCrc();
     
     Serial.println(F("LoRa initialized successfully."));
     return true;
@@ -51,12 +51,8 @@ bool HomeCommunication::sendMessage(DisplayMenu& menu, int menuType, int actionI
     errorCheck = errorCheck ^ ERROR_CHECK_MASK;       // XOR with mask for error checking
     messageByte |= errorCheck & 0x0F;                // Add error check in least significant 4 bits
     
-
-
     last_request_uint8_t = messageByte;
-
-
-
+    
     // Debug print
     Serial.print(F("Sending byte: 0b"));
     for (int i = 7; i >= 0; i--) {
@@ -73,6 +69,8 @@ bool HomeCommunication::sendMessage(DisplayMenu& menu, int menuType, int actionI
         Serial.println(F("Failed to send message"));
         return false;
     }
+
+    menu.displayConfirmationMessage(last_request + " sent");
     
     delay(10);  // Short delay for stability
     return true;

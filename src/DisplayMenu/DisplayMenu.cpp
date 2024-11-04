@@ -71,8 +71,8 @@ void DisplayMenu::displayConfirmationMessage(String confirmationMessage) {
     display.print(confirmationMessage);
     display.display();
     
-    // השהייה של 2.5 שניות
-    delay(2500);
+    // השהייה של 1.5 שניות
+    delay(1500);
     
     // מחיקת האזור
     display.fillRect(0, 0, SCREEN_WIDTH, 16, BLACK);
