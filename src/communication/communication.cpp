@@ -13,9 +13,9 @@ bool HomeCommunication::setupCommunication() {
         delay(100);
     }
     
-   // הגדרות למרחק מקסימלי
-    LoRa.setSpreadingFactor(12);
-    LoRa.setSignalBandwidth(62.5E3);
+   // lora initialization
+    LoRa.setSpreadingFactor(12); 
+    LoRa.setSignalBandwidth(125000);
     LoRa.setCodingRate4(5);
     LoRa.setPreambleLength(8);
     LoRa.setTxPower(20);
@@ -70,7 +70,7 @@ bool HomeCommunication::sendMessage(DisplayMenu& menu, int menuType, int actionI
         return false;
     }
 
-    menu.displayConfirmationMessage(last_request + " sent");
+    
     
     delay(10);  // Short delay for stability
     return true;
@@ -96,13 +96,16 @@ bool HomeCommunication::checkForAcknowledgment(bool& isWaitingForAck, DisplayMen
         if (receivedByte == last_request_uint8_t) {
             Serial.println(F("Acknowledgment received"));
             isWaitingForAck = false;
-            retry_count = 0;
-
-            menu.displayConfirmationMessage(last_request + " done");
+            
+            menu.displayConfirmationMessage(last_request + " done" , 1);
             return true;
         }
         else
             return false;
 }
 
+
+String HomeCommunication::getLastRequest() {
+    return last_request;
+}
 

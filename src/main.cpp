@@ -2,14 +2,14 @@
 #include "./Buttons/Buttons.h"
 #include "./DisplayMenu/DisplayMenu.h"
 
-// הצהרה לפונקציה listenForAcknowledgment
+// Declaration for the listenForAcknowledgment function
 void listenForAcknowledgment(void *parameter);
 
 HomeCommunication loraCommunication;
 Buttons buttons(32, 33, 25, 27);
 DisplayMenu menu;
 
-bool isWaitingForAck = false; // משתנה גלובלי
+bool isWaitingForAck = false; // Global variable
 unsigned long waitStartTime = 0;
 const unsigned long ACK_TIMEOUT = 18000;       // 10 second timeout
 TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
@@ -40,7 +40,7 @@ void loop() {
     // Check for timeout on waiting ACK
     if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
         Serial.println(F("Acknowledgment timeout"));
-        menu.displayConfirmationMessage("Timeout, Please try again.");
+        menu.displayConfirmationMessage("Timeout, Please try again.", 1);
         isWaitingForAck = false;
 
         // Delete the task if it was created (to free the core)
@@ -73,13 +73,12 @@ void loop() {
         if (buttons.isSelectPressed()) {
             if (strcmp(menu.getCurrentSelection(), "manual control") == 0) {
                 menu.enterManualControl();
-            }
-             else if (!isWaitingForAck) {
+            } else if (!isWaitingForAck) {
                 int menuType = menu.isInManualControl() ? 1 : 0;
                 int actionIndex = menu.getCurrentIndex();
 
                 // Send the message and start waiting for an ACK
-                if (loraCommunication.sendMessage( menu, menuType , actionIndex)) {
+                if (loraCommunication.sendMessage(menu, menuType, actionIndex)) {
                     isWaitingForAck = true;
                     waitStartTime = currentMillis;
 
@@ -94,6 +93,7 @@ void loop() {
                         0                        // Core to pin the task
                     );
                 }
+                menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " sent", 0);
             }
             lastButtonPress = currentMillis;
         }
