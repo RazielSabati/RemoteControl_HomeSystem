@@ -11,8 +11,12 @@ DisplayMenu menu;
 
 bool isWaitingForAck = false; // Global variable
 unsigned long waitStartTime = 0;
-const unsigned long ACK_TIMEOUT = 18000;       // 10 second timeout
+const unsigned long ACK_TIMEOUT = 12000;       // 10 second timeout
 TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
+
+// intialize the last call time for send_keep_alive function
+unsigned long lastCallToA = 0;
+unsigned long A_CALL_INTERVAL = 14000;  // 14 שניות
 
 void setup() {
     Serial.begin(9600);
@@ -48,6 +52,18 @@ void loop() {
             vTaskDelete(ackTaskHandle);
             ackTaskHandle = NULL;
         }
+    }
+
+
+        // Check if it's time to send a keep alive message
+    if ( !isWaitingForAck && currentMillis - lastCallToA >= A_CALL_INTERVAL) {
+        menu.displayConfirmationMessage("Keep alive sent", 1);
+        if ( !loraCommunication.send_keep_alive() )  // send_keep_alive failed
+            menu.displayConfirmationMessage("Keep alive failed", 1);
+        lastCallToA = currentMillis;  // update the next time
+        menu.displayConfirmationMessage("Keep alive done", 0);
+
+        A_CALL_INTERVAL = random(14000, 18000);  // update the interval
     }
     
     // Button handling with debounce
