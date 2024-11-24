@@ -11,7 +11,7 @@ DisplayMenu menu;
 
 bool isWaitingForAck = false; // Global variable
 unsigned long waitStartTime = 0;
-const unsigned long ACK_TIMEOUT = 12000;       // 10 second timeout
+const unsigned long ACK_TIMEOUT = 20000;       // 10 second timeout
 TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
 
 // intialize the last call time for send_keep_alive function
@@ -44,8 +44,9 @@ void loop() {
     // Check for timeout on waiting ACK
     if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
         Serial.println(F("Acknowledgment timeout"));
-        menu.displayConfirmationMessage("Timeout, Please try again.", 1);
+        menu.displayConfirmationMessage("Timeout,try again!", 1);
         isWaitingForAck = false;
+        loraCommunication.rollingCode++; // Increment the rolling code
 
         // Delete the task if it was created (to free the core)
         if (ackTaskHandle != NULL) {
