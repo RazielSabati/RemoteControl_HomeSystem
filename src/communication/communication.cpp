@@ -23,9 +23,9 @@ bool HomeCommunication::setupCommunication() {
         delay(100);
     }
 
-    LoRa.setSignalBandwidth(62.5E3);
-    LoRa.setSpreadingFactor(12);
-    LoRa.setCodingRate4(8);
+    LoRa.setSignalBandwidth(31.25E3);
+    LoRa.setSpreadingFactor(13);
+    LoRa.setCodingRate4(9);
     LoRa.setTxPower(20, PA_OUTPUT_PA_BOOST_PIN); // Specify output pin
 
     Serial.println(F("LoRa initialized successfully."));
@@ -116,7 +116,7 @@ bool HomeCommunication::checkForAcknowledgment(bool& isWaitingForAck, DisplayMen
         
         if( (message ^ 0xF0) == last_request_code){
             Serial.println(F("Acknowledgment received"));
-            menu.displayConfirmationMessage(last_request + " done", 0);
+            menu.displayConfirmationMessage(last_request + " done", 1);
             isWaitingForAck = false;
             return true;
         }

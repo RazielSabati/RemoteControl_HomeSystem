@@ -69,7 +69,7 @@ void DisplayMenu::displayConfirmationMessage(String confirmationMessage, int con
     
     if (confirm == 0) {
         // Delay for 1.5 seconds
-        delay(1500);
+        delay(1000);
         display.fillRect(0, 0, SCREEN_WIDTH, 16, BLACK);
         display.display();
         return;

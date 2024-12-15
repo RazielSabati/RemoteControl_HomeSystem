@@ -11,12 +11,12 @@ DisplayMenu menu;
 
 bool isWaitingForAck = false; // Global variable
 unsigned long waitStartTime = 0;
-const unsigned long ACK_TIMEOUT = 20000;       // 10 second timeout
+const unsigned long ACK_TIMEOUT = 30000;       // 20 second timeout
 TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
 
 // intialize the last call time for send_keep_alive function
 unsigned long lastCallToA = 0;
-unsigned long A_CALL_INTERVAL = 14000;  // 14 שניות
+unsigned long A_CALL_INTERVAL = 20000;  // 20 שניות
 
 void setup() {
     Serial.begin(9600);
@@ -36,6 +36,7 @@ void setup() {
     menu.setupScreen();
 
     Serial.println(F("Home system ready."));
+     menu.displayConfirmationMessage("Home system ready.", 1);
 }
 
 void loop() {
@@ -44,7 +45,7 @@ void loop() {
     // Check for timeout on waiting ACK
     if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
         Serial.println(F("Acknowledgment timeout"));
-        menu.displayConfirmationMessage("Timeout,try again!", 1);
+        menu.displayConfirmationMessage("Timeout,try again!", 0);
         isWaitingForAck = false;
         loraCommunication.rollingCode++; // Increment the rolling code
 
@@ -64,7 +65,7 @@ void loop() {
         lastCallToA = currentMillis;  // update the next time
         menu.displayConfirmationMessage("Keep alive done", 0);
 
-        A_CALL_INTERVAL = random(14000, 18000);  // update the interval
+        A_CALL_INTERVAL = random(18000, 30000);  // update the interval
     }
     
     // Button handling with debounce
@@ -90,12 +91,18 @@ void loop() {
         if (buttons.isSelectPressed()) {
             if (strcmp(menu.getCurrentSelection(), "manual control") == 0) {
                 menu.enterManualControl();
-            } else if (!isWaitingForAck) {
+            }
+            else if (!isWaitingForAck) {
+                
                 int menuType = menu.isInManualControl() ? 1 : 0;
                 int actionIndex = menu.getCurrentIndex();
 
+                menu.displayConfirmationMessage("send " + (String)(menu.getData(menuType, actionIndex)) , 1);
+
                 // Send the message and start waiting for an ACK
                 if (loraCommunication.sendMessage(menu, menuType, actionIndex)) {
+
+                    menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " sent", 1);
                     isWaitingForAck = true;
                     waitStartTime = currentMillis;
 
@@ -110,7 +117,10 @@ void loop() {
                         0                        // Core to pin the task
                     );
                 }
-                menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " sent", 0);
+                else
+                    menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " failed", 0);
+
+                
             }
             lastButtonPress = currentMillis;
         }
