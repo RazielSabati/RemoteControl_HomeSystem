@@ -15,7 +15,7 @@ class DisplayMenu {
   private:
     // Matrix of menu items
     const char* namesMatrix[2][6] = {
-      { "test scenario", "read battery %", "turn off system", "scenario 1", "scenario 2", "manual control" },
+      { "test scenario", "read battery", "turn off system", "scenario 1", "scenario 2", "manual control" },
       { "turn on led", "turn off led", "turn on voice", "turn off voice", "turn on heat", "turn off heat" }
     };
 

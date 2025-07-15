@@ -113,10 +113,20 @@ bool HomeCommunication::checkForAcknowledgment(bool& isWaitingForAck, DisplayMen
 
         message = decrypted[0]; // Extract the message from the decrypted data
 
+        uint8_t batteryPercent = decrypted[5];
+
         
         if( (message ^ 0xF0) == last_request_code){
             Serial.println(F("Acknowledgment received"));
-            menu.displayConfirmationMessage(last_request + " done", 1);
+
+            if (((last_request_code ^ 0xF0) & 0xF0) == 0x10) {
+             // menuType == 0 AND actionIndex == 1 --> read battery percentage
+                menu.displayConfirmationMessage(last_request + "  ("+ String(batteryPercent) +"%)", 1);
+                delay(2500); // Delay to allow the user to see the message
+            }
+            else
+                menu.displayConfirmationMessage(last_request + " done", 1);
+            // Reset the waiting flag
             isWaitingForAck = false;
             return true;
         }
