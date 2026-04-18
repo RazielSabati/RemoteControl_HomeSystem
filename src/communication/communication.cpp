@@ -24,7 +24,8 @@ bool HomeCommunication::setupCommunication() {
     }
 
     LoRa.setSignalBandwidth(31.25E3);
-    LoRa.setSpreadingFactor(13);
+    // LoRa.setSpreadingFactor(13);
+    LoRa.setSpreadingFactor(8);
     LoRa.setCodingRate4(9);
     LoRa.setTxPower(20, PA_OUTPUT_PA_BOOST_PIN); // Specify output pin
 
