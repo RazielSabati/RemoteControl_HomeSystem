@@ -6,7 +6,7 @@
 #include "./communication/packet_handler.h"
 
 
-communication_protocol_interface_t g_bluetooth_communicator;
+// communication_protocol_interface_t g_bluetooth_communicator;
 extern bt_settings_t g_bt;
 
 // Declaration for the listenForAcknowledgment function
@@ -44,8 +44,8 @@ void setup() {
 
     // Serial.println(F("Home system ready."));
     // menu.displayConfirmationMessage("Home system ready.", 1);
-
-     if(!bluetooth__setup(&g_bt)) {
+    bluetooth__setup(&g_bt);
+     if(!g_bt.setup_successful) {
         Serial.println(F("Failed to initialize Bluetooth! Halting."));
         while (1) {
             delay(1000);
@@ -57,7 +57,8 @@ void setup() {
 }
 
 void loop() {
-    communication_protocol__run_main_logic(&g_bluetooth_communicator, &packet_handler__process);
+    bluetooth__handler_received_byte(&g_bt, &process_incoming_packet);
+    // communication_protocol__run_main_logic(&g_bluetooth_communicator, &packet_handler__process);
 }
 //     unsigned long currentMillis = millis();
 
