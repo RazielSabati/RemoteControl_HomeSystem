@@ -1,63 +1,54 @@
-#include "./communication/communication.h"
 #include "./communication/bluetooth_wrapper.h"
-#include "./Buttons/Buttons.h"
-#include "./DisplayMenu/DisplayMenu.h"
-#include "./communication/communication_protocol.h"
 #include "./communication/packet_handler.h"
-
+#include "./communication/lora_wrapper.h"
 
 // communication_protocol_interface_t g_bluetooth_communicator;
 extern bt_settings_t g_bt;
+extern Lora_settings_t g_lora;
 
-// Declaration for the listenForAcknowledgment function
-void listenForAcknowledgment(void *parameter);
+// // Declaration for the listenForAcknowledgment function
+// void listenForAcknowledgment(void *parameter);
 
-HomeCommunication loraCommunication;
-Buttons buttons(32, 33, 25, 27);
-DisplayMenu menu;
+// HomeCommunication loraCommunication;
+// Buttons buttons(32, 33, 25, 27);
+// DisplayMenu menu;
 
-bool isWaitingForAck = false; // Global variable
-unsigned long waitStartTime = 0;
-const unsigned long ACK_TIMEOUT = 30000;       // 20 second timeout
-TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
+// bool isWaitingForAck = false; // Global variable
+// unsigned long waitStartTime = 0;
+// const unsigned long ACK_TIMEOUT = 30000;       // 20 second timeout
+// TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
 
-// intialize the last call time for send_keep_alive function
-unsigned long lastCallToA = 0;
-unsigned long A_CALL_INTERVAL = 20000;  // 20 שניות
+// // intialize the last call time for send_keep_alive function
+// unsigned long lastCallToA = 0;
+// unsigned long A_CALL_INTERVAL = 20000;  // 20 שניות
 
-void setup() {
+void setup()
+{
     Serial.begin(9600);
-    
-    // Wait for serial with timeout
-    unsigned long serialStart = millis();
-    while (!Serial && millis() - serialStart < 5000);
-    
-    // if (!loraCommunication.setupCommunication()) {
-    //     Serial.println(F("Failed to initialize LoRa! Halting."));
-    //     while (1) {
-    //         delay(1000);
-    //     }
-    // }
-    
-    // buttons.setupButtons();
-    // menu.setupScreen();
+    SPI.begin();
 
-    // Serial.println(F("Home system ready."));
-    // menu.displayConfirmationMessage("Home system ready.", 1);
-    bluetooth__setup(&g_bt);
-     if(!g_bt.setup_successful) {
-        Serial.println(F("Failed to initialize Bluetooth! Halting."));
-        while (1) {
+    if (!bluetooth__setup(&g_bt))
+    {
+        digitalWrite(STATUS_LED_RED_PIN, HIGH);
+        delay(300);
+        digitalWrite(STATUS_LED_RED_PIN, LOW);
+        delay(300);
+    }
+
+    if (!setup_Lora_module(&g_lora))
+    {
+        Serial.println(F("Failed to initialize LoRa packet parser! Halting."));
+        while (1)
+        {
             delay(1000);
         }
     }
-
-    Serial.println(F("Bluetooth initialized successfully."));
-
 }
 
-void loop() {
-    bluetooth__handler_received_byte(&g_bt, &process_incoming_packet);
+void loop()
+{
+    bluetooth__poll_and_process_packets(&g_bt, &process_incoming_packet);
+    lora_packet_parser__poll();
     // communication_protocol__run_main_logic(&g_bluetooth_communicator, &packet_handler__process);
 }
 //     unsigned long currentMillis = millis();
@@ -76,7 +67,6 @@ void loop() {
 //         }
 //     }
 
-
 //         // Check if it's time to send a keep alive message
 //     if ( !isWaitingForAck && currentMillis - lastCallToA >= A_CALL_INTERVAL) {
 //         menu.displayConfirmationMessage("Keep alive sent", 1);
@@ -87,33 +77,33 @@ void loop() {
 
 //         A_CALL_INTERVAL = random(18000, 30000);  // update the interval
 //     }
-    
+
 //     // Button handling with debounce
 //     static unsigned long lastButtonPress = 0;
 //     const unsigned long DEBOUNCE_DELAY = 200;
-    
+
 //     if (currentMillis - lastButtonPress >= DEBOUNCE_DELAY) {
 //         if (buttons.isUpPressed()) {
 //             menu.moveUp();
 //             lastButtonPress = currentMillis;
 //         }
-        
+
 //         if (buttons.isDownPressed()) {
 //             menu.moveDown();
 //             lastButtonPress = currentMillis;
 //         }
-        
+
 //         if (buttons.isBackPressed() && menu.isInManualControl()) {
 //             menu.moveBackToMenu();
 //             lastButtonPress = currentMillis;
 //         }
-        
+
 //         if (buttons.isSelectPressed()) {
 //             if (strcmp(menu.getCurrentSelection(), "manual control") == 0) {
 //                 menu.enterManualControl();
 //             }
 //             else if (!isWaitingForAck) {
-                
+
 //                 int menuType = menu.isInManualControl() ? 1 : 0;
 //                 int actionIndex = menu.getCurrentIndex();
 
@@ -140,7 +130,6 @@ void loop() {
 //                 else
 //                     menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " failed", 0);
 
-                
 //             }
 //             lastButtonPress = currentMillis;
 //         }

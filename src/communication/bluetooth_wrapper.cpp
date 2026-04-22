@@ -36,39 +36,6 @@
 //     return true;
 // }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #include "bluetooth_wrapper.h"
 bt_settings_t g_bt;
 // #include "freertos/FreeRTOS.h"
@@ -83,34 +50,11 @@ bt_settings_t g_bt;
 
 // static volatile bool s_connection_check_flag = false;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //  //Accessing the internal FreeRTOS queue handle from the BluetoothSerial library -  possible because the variable isnt 'static'
-// extern xQueueHandle _spp_tx_queue; 
+// extern xQueueHandle _spp_tx_queue;
 
 // //This volatile variable mirrors the internal 'SPP_CONGESTED' bit.
-// static volatile bool s_is_congested = false; 
+// static volatile bool s_is_congested = false;
 
 // /**
 //  * @brief Internal callback for ESP32 SPP (Serial Port Profile) events.
@@ -118,9 +62,9 @@ bt_settings_t g_bt;
 //  * * @param event The type of SPP event (e.g., Data received, Congestion, etc.)
 //  * @param param Pointer to event parameters containing the congestion status.
 //  */
-// void IRAM_ATTR bluetooth_internal_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) 
+// void IRAM_ATTR bluetooth_internal_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 // {
-//     if (event == ESP_SPP_CONG_EVT) 
+//     if (event == ESP_SPP_CONG_EVT)
 //     {
 //         /* * param->cong.cong == true  -> Link is full/congested (Stop sending)
 //          * param->cong.cong == false -> Link is free (Resume sending)
@@ -134,9 +78,9 @@ bt_settings_t g_bt;
 //  * This is a high-performance check of the congestion flag.
 //  * * @return true if the link is free to send, false if it is congested.
 //  */
-// bool SPP_CAN_SEND() 
+// bool SPP_CAN_SEND()
 // {
-//     /* * If s_is_congested is false, it means we are NOT congested, 
+//     /* * If s_is_congested is false, it means we are NOT congested,
 //      * which corresponds to the SPP_CONGESTED bit being SET in the library.
 //      */
 //     return !s_is_congested;
@@ -147,45 +91,15 @@ bt_settings_t g_bt;
 //  * Useful to avoid overflow before calling write().
 //  * * @return Number of free packets (slots) available in the TX queue.
 //  */
-// int txQueueFree() 
+// int txQueueFree()
 // {
-//     if (_spp_tx_queue == NULL) 
+//     if (_spp_tx_queue == NULL)
 //     {
 //         return 0;
 //     }
 //     /* Standard FreeRTOS call to check remaining spaces in a queue */
 //     return (int)uxQueueSpacesAvailable(_spp_tx_queue);
 // }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // void BT_connection_check()
 // {
@@ -283,7 +197,7 @@ bt_settings_t g_bt;
 //             bt->obj.disconnect();
 //             vTaskDelay(pdMS_TO_TICKS(50));
 //         }
-//         _spp_tx_queue = NULL; 
+//         _spp_tx_queue = NULL;
 //         s_is_congested = false;
 //         bt->obj.end();
 
@@ -505,9 +419,8 @@ bt_settings_t g_bt;
 //     return RETURN_CODE__SUCCESS;
 // }
 
-// #include "bluetooth_wrapper.h"
-// bt_settings_t g_bt;
-
+#include "bluetooth_wrapper.h"
+bt_settings_t g_bt;
 
 return_code_e bluetooth__setup(bt_settings_t *bt)
 {
@@ -527,17 +440,18 @@ exit:
     bt->error_code = status;
     return status;
 }
+static void bluetooth__reset_parser(bt_settings_t *bt)
+{
+    if (bt == NULL)
+        return;
 
+    // עכשיו הפונקציה באמת מחזירה את המנתח למצב "נקי" לגמרי
+    bt->incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
+    bt->rx_buffer_index = 0;
+    memset(&bt->received_packet, 0, sizeof(packet_t));
+}
 
-uint8_t bluetooth_incoming_byte_del1;
-uint8_t bluetooth_incoming_byte_del2;
-
-uint8_t bluetooth_rx_buffer_index = 0;
-uint8_t bluetooth_rx_buffer[BUFFER_SIZE] = {0};
-incoming_data_state_e bluetooth_s_incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
-command_t bluetooth_received_command;
-
-void bluetooth__handler_received_byte(bt_settings_t *bt,process_packet_fn process_packet)
+void bluetooth__poll_and_process_packets(bt_settings_t *bt, process_packet_fn process_packet)
 {
     while (bt->obj.available())
     {
@@ -547,106 +461,59 @@ void bluetooth__handler_received_byte(bt_settings_t *bt,process_packet_fn proces
 
         uint8_t incoming_byte = (uint8_t)incoming;
 
-        // Serial.println(incoming_byte);
-
-        switch (bluetooth_s_incoming_data_state)
+        switch (bt->incoming_data_state)
         {
         case INCOMING_DATA__WAIT_FOR_PACKET:
-
-            if ((incoming_byte == 0x59) && (bluetooth_incoming_byte_del1 == 0x4F) && (bluetooth_incoming_byte_del2 == 0x52))
+            // Check for packet header sequence: we need to see the three header bytes in order (0x52, 0x4F, 0x59)
+            if ((incoming_byte == PACKET_HEADER[2]) && (bt->incoming_byte_del1 == PACKET_HEADER[1]) && (bt->incoming_byte_del2 == PACKET_HEADER[0]))
             {
-                bluetooth_s_incoming_data_state = INCOMING_DATA__GET_COMMAND;
-                bluetooth_rx_buffer_index = 0;
-                // Serial.println("header");
+                bt->incoming_data_state = INCOMING_DATA__GET_COMMAND;
             }
             break;
 
         case INCOMING_DATA__GET_COMMAND:
-            bluetooth_received_command.command_id = (command_id_e)incoming_byte;
-            bluetooth_s_incoming_data_state = INCOMING_DATA__GET_LENGTH;
-            // Serial.println(bluetooth_received_command.command_id);
+            bt->received_packet.command = (command_e)incoming_byte;
+            bt->incoming_data_state = INCOMING_DATA__GET_LENGTH;
             break;
 
         case INCOMING_DATA__GET_LENGTH:
-            if (incoming_byte > BUFFER_SIZE)
+            if (incoming_byte > BUFFER_SIZE || incoming_byte == 0)
             {
-                bluetooth_s_incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
+                if (incoming_byte == 0)
+                {
+                    process_packet(bt->received_packet); // valid packet with no payload
+                }
+                bluetooth__reset_parser(bt);
             }
             else
             {
-                bluetooth_received_command.payload_length = incoming_byte;
-                if (bluetooth_received_command.payload_length == 0)
-                {
-                    process_packet(bluetooth_received_command);
-                    bluetooth_s_incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
-                }
-                else
-                {
-                    bluetooth_s_incoming_data_state = INCOMING_DATA__READ_PAYLOAD;
-                }
+                bt->received_packet.payload_length = incoming_byte;
+                bt->incoming_data_state = INCOMING_DATA__READ_PAYLOAD;
+                bt->rx_buffer_index = 0;
             }
             break;
 
         case INCOMING_DATA__READ_PAYLOAD:
-            if (bluetooth_rx_buffer_index < bluetooth_received_command.payload_length - 1)
+            // write byte to payload buffer if there is space (should always be the case due to previous length check)
+            if (bt->rx_buffer_index < BUFFER_SIZE)
             {
-                bluetooth_rx_buffer[bluetooth_rx_buffer_index++] = incoming_byte;
+                bt->received_packet.payload[bt->rx_buffer_index++] = incoming_byte;
             }
-            else
-            {
-                bluetooth_rx_buffer[bluetooth_rx_buffer_index] = incoming_byte;
 
-                memcpy(bluetooth_received_command.data, bluetooth_rx_buffer, bluetooth_received_command.payload_length);
-                process_packet(bluetooth_received_command);
-                bluetooth_s_incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
+            // does the packet have the full payload?
+            if (bt->rx_buffer_index >= bt->received_packet.payload_length)
+            {
+                process_packet(bt->received_packet);
+                bluetooth__reset_parser(bt);
             }
             break;
 
         default:
-            bluetooth_s_incoming_data_state = INCOMING_DATA__WAIT_FOR_PACKET;
+            bluetooth__reset_parser(bt);
             break;
         }
 
-        bluetooth_incoming_byte_del2 = bluetooth_incoming_byte_del1;
-        bluetooth_incoming_byte_del1 = incoming_byte;
-    }
-}
-
-
-
-
-void process_incoming_packet(command_t received_command)
-{
-    // הגדרת המזהים כפי שנקבעו בפרוטוקול
-    const uint8_t HEADER_R = 0x52;
-    const uint8_t HEADER_O = 0x4F;
-    const uint8_t HEADER_Y = 0x59;
-    const uint8_t CMD_HANDSHAKE = 0x01;
-    const uint8_t RESP_SUCCESS = 0x02;
-
-    switch (received_command.command_id)
-    {
-        case COMMAND_HAND_SHAKE: // וודא שזה שווה ל-0x01
-        {
-            Serial.println(F("Handshake received, sending response..."));
-
-            uint8_t response_packet[7];
-            
-            response_packet[0] = HEADER_R;    // 0x52
-            response_packet[1] = HEADER_O;    // 0x4F
-            response_packet[2] = HEADER_Y;    // 0x59
-            response_packet[3] = CMD_HANDSHAKE; // 0x01
-            response_packet[4] = RESP_SUCCESS;  // 0x02 (מה שהאנדרואיד מצפה לו)
-            response_packet[5] = 0xAA; // דוגמה ל-0xOO
-            response_packet[6] = 0xBB; // דוגמה ל-0xMM
-
-            // שליחת כל החבילה בבת אחת
-            g_bt.obj.write(response_packet, 7);
-            break;
-        }
-    
-        default:
-            // Unknown or unhandled command
-            break;
+        bt->incoming_byte_del2 = bt->incoming_byte_del1;
+        bt->incoming_byte_del1 = incoming_byte;
     }
 }
