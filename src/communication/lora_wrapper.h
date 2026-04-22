@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include <AESLib.h>
 #include "return_code.h"
-#include "packet_handler.h"
+#include "structs.h"
 
 #define LORA_MAX_FRAME_SIZE 255
 
@@ -29,5 +29,5 @@ typedef struct
 extern Lora_settings_t g_lora;
 bool setup_Lora_module(Lora_settings_t *lora);
 
-void lora_packet_parser__poll();
+bool lora__poll_packet(Lora_settings_t *lora, packet_t *output_packet);
 incoming_packet_retval_e lora_packet_parser(const uint8_t *frame, uint8_t frame_length, packet_t *output_packet);

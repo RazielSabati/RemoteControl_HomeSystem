@@ -1,12 +1,38 @@
 #include "packet_handler.h"
+#include "bluetooth_wrapper.h"
+#include "lora_wrapper.h"
 
 // extern column_data_t g_columns_copy[COLUMN__MAX];
 
 void packet_handler__process(packet_t *received_packet)
 {
-    uint8_t return_code = 0;
+    received_packet_message_t message = {0};
+    if (received_packet == NULL)
+    {
+        return;
+    }
 
-    switch (received_packet->command)
+    memcpy(&message.packet, received_packet, sizeof(packet_t));
+    message.source = PACKET_SOURCE__BLUETOOTH;
+    packet_handler__process_message(&message);
+}
+
+void process_incoming_packet(packet_t received_packet)
+{
+    received_packet_message_t message = {0};
+    memcpy(&message.packet, &received_packet, sizeof(packet_t));
+    message.source = PACKET_SOURCE__LORA;
+    packet_handler__process_message(&message);
+}
+
+void packet_handler__process_message(const received_packet_message_t *message)
+{
+    if (message == NULL)
+    {
+        return;
+    }
+
+    switch (message->packet.command)
     {
     case COMMAND__HAND_SHAKE_BLUETOOTH:
     {
@@ -22,7 +48,16 @@ void packet_handler__process(packet_t *received_packet)
         response_packet[5] = 0xAA;
         response_packet[6] = 0xBB;
 
-        g_bt.obj.write(response_packet, 7);
+        if (message->source == PACKET_SOURCE__LORA)
+        {
+            g_lora.obj.beginPacket();
+            g_lora.obj.write(response_packet, 7);
+            (void)g_lora.obj.endPacket();
+        }
+        else
+        {
+            g_bt.obj.write(response_packet, 7);
+        }
         break;
     }
     break;

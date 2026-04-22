@@ -3,11 +3,8 @@
 #undef dump
 #include <BluetoothSerial.h>
 #include "return_code.h"
-#include "packet_handler.h"
 #include "structs.h"
 
-#define BUFFER_SIZE 100
-#define HEADER_LENGTH 3
 #define DEVICE_NAME "MADAN-1"
 
 typedef void (*process_packet_fn)(packet_t);
@@ -32,5 +29,4 @@ typedef struct
 extern bt_settings_t g_bt;
 
 return_code_e bluetooth__setup(bt_settings_t *bt);
-
-void bluetooth__poll_and_process_packets(bt_settings_t *bt, process_packet_fn process_packet);
+bool bluetooth__poll_packet(bt_settings_t *bt, packet_t *output_packet);

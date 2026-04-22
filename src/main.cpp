@@ -1,156 +1,129 @@
-#include "./communication/bluetooth_wrapper.h"
-#include "./communication/packet_handler.h"
-#include "./communication/lora_wrapper.h"
+#include <Arduino.h>
+#include <SPI.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
 
-// communication_protocol_interface_t g_bluetooth_communicator;
+#include <pins.h>
+
+#include "./communication/bluetooth_wrapper.h"
+#include "./communication/lora_wrapper.h"
+#include "./communication/packet_handler.h"
+
 extern bt_settings_t g_bt;
 extern Lora_settings_t g_lora;
 
-// // Declaration for the listenForAcknowledgment function
-// void listenForAcknowledgment(void *parameter);
+static QueueHandle_t g_packet_queue = NULL;
+static const uint8_t PACKET_QUEUE_LENGTH = 10;
 
-// HomeCommunication loraCommunication;
-// Buttons buttons(32, 33, 25, 27);
-// DisplayMenu menu;
+static void bluetooth_error_blink_forever()
+{
+    digitalWrite(STATUS_LED_BLUE_PIN, LOW);
+    while (1)
+    {
+        digitalWrite(STATUS_LED_RED_PIN, HIGH);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        digitalWrite(STATUS_LED_RED_PIN, LOW);
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+}
 
-// bool isWaitingForAck = false; // Global variable
-// unsigned long waitStartTime = 0;
-// const unsigned long ACK_TIMEOUT = 30000;       // 20 second timeout
-// TaskHandle_t ackTaskHandle = NULL;             // Handle for the acknowledgment task
+static void bluetooth_rx_task(void *parameter)
+{
+    (void)parameter;
+    packet_t packet = {0};
 
-// // intialize the last call time for send_keep_alive function
-// unsigned long lastCallToA = 0;
-// unsigned long A_CALL_INTERVAL = 20000;  // 20 שניות
+    for (;;)
+    {
+        packet = {0};
+        if (bluetooth__poll_packet(&g_bt, &packet))
+        {
+            received_packet_message_t msg = {0};
+            memcpy(&msg.packet, &packet, sizeof(packet_t));
+            msg.source = PACKET_SOURCE__BLUETOOTH;
+            (void)xQueueSend(g_packet_queue, &msg, 0);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+static void lora_rx_task(void *parameter)
+{
+    (void)parameter;
+
+    packet_t packet = {0};
+
+    for (;;)
+    {
+        packet = {0};
+        if (lora__poll_packet(&g_lora, &packet))
+        {
+            received_packet_message_t msg = {0};
+            memcpy(&msg.packet, &packet, sizeof(packet_t));
+            msg.source = PACKET_SOURCE__LORA;
+            (void)xQueueSend(g_packet_queue, &msg, 0);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+static void packet_handler_task(void *parameter)
+{
+    (void)parameter;
+
+    received_packet_message_t msg = {0};
+    for (;;)
+    {
+        if (xQueueReceive(g_packet_queue, &msg, portMAX_DELAY) == pdTRUE)
+        {
+            packet_handler__process_message(&msg);
+        }
+    }
+}
 
 void setup()
 {
     Serial.begin(9600);
     SPI.begin();
 
-    if (!bluetooth__setup(&g_bt))
-    {
-        digitalWrite(STATUS_LED_RED_PIN, HIGH);
-        delay(300);
-        digitalWrite(STATUS_LED_RED_PIN, LOW);
-        delay(300);
-    }
+    pinMode(STATUS_LED_RED_PIN, OUTPUT);
+    pinMode(STATUS_LED_BLUE_PIN, OUTPUT);
+    digitalWrite(STATUS_LED_RED_PIN, LOW);
+    digitalWrite(STATUS_LED_BLUE_PIN, LOW);
 
-    if (!setup_Lora_module(&g_lora))
+    g_packet_queue = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(received_packet_message_t));
+    if (g_packet_queue == NULL)
     {
-        Serial.println(F("Failed to initialize LoRa packet parser! Halting."));
         while (1)
         {
             delay(1000);
         }
     }
+
+    if (bluetooth__setup(&g_bt) != RETURN_CODE__SUCCESS)
+    {
+        bluetooth_error_blink_forever();
+    }
+
+    if (!setup_Lora_module(&g_lora))
+    {
+        while (1)
+        {
+            delay(1000);
+        }
+    }
+
+    digitalWrite(STATUS_LED_RED_PIN, LOW);
+    digitalWrite(STATUS_LED_BLUE_PIN, HIGH);
+
+    (void)xTaskCreatePinnedToCore(bluetooth_rx_task, "bt_rx_task", 4096, NULL, 1, NULL, 1);
+    (void)xTaskCreatePinnedToCore(lora_rx_task, "lora_rx_task", 4096, NULL, 1, NULL, 1);
+    (void)xTaskCreatePinnedToCore(packet_handler_task, "pkt_handler_task", 4096, NULL, 2, NULL, 1);
 }
 
 void loop()
 {
-    bluetooth__poll_and_process_packets(&g_bt, &process_incoming_packet);
-    lora_packet_parser__poll();
-    // communication_protocol__run_main_logic(&g_bluetooth_communicator, &packet_handler__process);
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
-//     unsigned long currentMillis = millis();
-
-//     // Check for timeout on waiting ACK
-//     if (isWaitingForAck && currentMillis - waitStartTime >= ACK_TIMEOUT) {
-//         Serial.println(F("Acknowledgment timeout"));
-//         menu.displayConfirmationMessage("Timeout,try again!", 0);
-//         isWaitingForAck = false;
-//         loraCommunication.rollingCode++; // Increment the rolling code
-
-//         // Delete the task if it was created (to free the core)
-//         if (ackTaskHandle != NULL) {
-//             vTaskDelete(ackTaskHandle);
-//             ackTaskHandle = NULL;
-//         }
-//     }
-
-//         // Check if it's time to send a keep alive message
-//     if ( !isWaitingForAck && currentMillis - lastCallToA >= A_CALL_INTERVAL) {
-//         menu.displayConfirmationMessage("Keep alive sent", 1);
-//         if ( !loraCommunication.send_keep_alive() )  // send_keep_alive failed
-//             menu.displayConfirmationMessage("Keep alive failed", 1);
-//         lastCallToA = currentMillis;  // update the next time
-//         menu.displayConfirmationMessage("Keep alive done", 0);
-
-//         A_CALL_INTERVAL = random(18000, 30000);  // update the interval
-//     }
-
-//     // Button handling with debounce
-//     static unsigned long lastButtonPress = 0;
-//     const unsigned long DEBOUNCE_DELAY = 200;
-
-//     if (currentMillis - lastButtonPress >= DEBOUNCE_DELAY) {
-//         if (buttons.isUpPressed()) {
-//             menu.moveUp();
-//             lastButtonPress = currentMillis;
-//         }
-
-//         if (buttons.isDownPressed()) {
-//             menu.moveDown();
-//             lastButtonPress = currentMillis;
-//         }
-
-//         if (buttons.isBackPressed() && menu.isInManualControl()) {
-//             menu.moveBackToMenu();
-//             lastButtonPress = currentMillis;
-//         }
-
-//         if (buttons.isSelectPressed()) {
-//             if (strcmp(menu.getCurrentSelection(), "manual control") == 0) {
-//                 menu.enterManualControl();
-//             }
-//             else if (!isWaitingForAck) {
-
-//                 int menuType = menu.isInManualControl() ? 1 : 0;
-//                 int actionIndex = menu.getCurrentIndex();
-
-//                 menu.displayConfirmationMessage("send " + (String)(menu.getData(menuType, actionIndex)) , 1);
-
-//                 // Send the message and start waiting for an ACK
-//                 if (loraCommunication.sendMessage(menu, menuType, actionIndex)) {
-
-//                     menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " sent", 1);
-//                     isWaitingForAck = true;
-//                     waitStartTime = currentMillis;
-
-//                     // Create the acknowledgment task only when waiting for an ACK
-//                     xTaskCreatePinnedToCore(
-//                         listenForAcknowledgment, // Task function
-//                         "ListenForAck",          // Task name
-//                         10000,                   // Stack size
-//                         NULL,                    // Parameters
-//                         1,                       // Priority
-//                         &ackTaskHandle,          // Task handle
-//                         0                        // Core to pin the task
-//                     );
-//                 }
-//                 else
-//                     menu.displayConfirmationMessage(loraCommunication.getLastRequest() + " failed", 0);
-
-//             }
-//             lastButtonPress = currentMillis;
-//         }
-//     }
-// }
-
-// // Task to listen for acknowledgment messages (runs on core 0)
-// void listenForAcknowledgment(void *parameter) {
-//     while (isWaitingForAck) {  // Run only if still waiting for ACK
-//         if (loraCommunication.checkForAcknowledgment(isWaitingForAck, menu)) {
-//             Serial.println(F("Acknowledgment received in task"));
-//             isWaitingForAck = false;
-
-//             // Delete the task once acknowledgment is received
-//             if (ackTaskHandle != NULL) {
-//                 vTaskDelete(ackTaskHandle);
-//                 ackTaskHandle = NULL;
-//             }
-//             break; // Exit the loop after acknowledgment is handled
-//         }
-//         vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay to prevent overloading
-//     }
-//     vTaskDelete(NULL); // Delete the current task
-// }
