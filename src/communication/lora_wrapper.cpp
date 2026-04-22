@@ -1,7 +1,5 @@
 #include "lora_wrapper.h"
 
-#include "packet_handler.h"
-
 Lora_settings_t g_lora;
 
 bool setup_Lora_module(Lora_settings_t *lora)
@@ -52,6 +50,7 @@ bool setup_Lora_module(Lora_settings_t *lora)
 
     lora->setup_successful = true;
     lora->error_code = RETURN_CODE__SUCCESS;
+    secure_ccm_reset_replay_window(lora->last_rx_counter24);
 
 #ifdef DEBUG_ENABLED
     Serial.print(F("\n[LoRa] Success! Frequency: "));
@@ -86,7 +85,7 @@ incoming_packet_retval_e lora_packet_parser(const uint8_t *frame, uint8_t frame_
         return INCOMING_PACKET_RETVAL__INVALID_PAYLOAD_LENGTH;
     }
 
-    if (frame_length != (uint8_t)(METADATA_LENGTH + payload_len))
+    if (frame_length < (uint8_t)(METADATA_LENGTH + payload_len))
     {
         return INCOMING_PACKET_RETVAL__INVALID_PAYLOAD_LENGTH;
     }
@@ -102,6 +101,38 @@ incoming_packet_retval_e lora_packet_parser(const uint8_t *frame, uint8_t frame_
     }
 
     return INCOMING_PACKET_RETVAL__FOUND_PACKET;
+}
+
+bool lora__build_encrypted_frame(Lora_settings_t *lora,
+                                 command_e command,
+                                 const uint8_t *payload,
+                                 uint8_t payload_length,
+                                 uint8_t *output_frame,
+                                 uint8_t *output_length)
+{
+    if (lora == NULL || output_frame == NULL || output_length == NULL)
+    {
+        return false;
+    }
+
+    secure_ccm_status_e status = secure_ccm_encrypt_packet(command,
+                                                           payload,
+                                                           payload_length,
+                                                           lora->tx_counter24,
+                                                           output_frame,
+                                                           output_length);
+    if (status != SECURE_CCM_STATUS__SUCCESS)
+    {
+        return false;
+    }
+
+    lora->tx_counter24 = (lora->tx_counter24 + 1) & 0x00FFFFFFu;
+    if (lora->tx_counter24 == 0)
+    {
+        lora->tx_counter24 = 1;
+    }
+
+    return true;
 }
 
 bool lora__poll_packet(Lora_settings_t *lora, packet_t *output_packet)
@@ -128,6 +159,19 @@ bool lora__poll_packet(Lora_settings_t *lora, packet_t *output_packet)
 
     uint8_t raw_frame[LORA_MAX_FRAME_SIZE] = {0};
     uint8_t bytes_read = (uint8_t)lora->obj.readBytes(raw_frame, packet_size);
+
+    if (lora->encryption_enabled)
+    {
+        uint32_t packet_counter = 0;
+        secure_ccm_status_e status = secure_ccm_decrypt_packet(raw_frame, bytes_read, output_packet, &packet_counter);
+        if (status != SECURE_CCM_STATUS__SUCCESS)
+        {
+            return false;
+        }
+
+        lora->last_rx_counter24 = packet_counter & 0x00FFFFFFu;
+        return true;
+    }
 
     return (lora_packet_parser(raw_frame, bytes_read, output_packet) == INCOMING_PACKET_RETVAL__FOUND_PACKET);
 }
