@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "system_telemetry.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -32,10 +33,34 @@ extern "C"
 
     typedef enum
     {
-        COMMAND__MIN,
+        COMMAND__MIN = 0x00,
 
-        COMMAND__HAND_SHAKE_BLUETOOTH = 0x01,
-        COMMAND__MAX,
+        // --- Bluetooth & System Link ---
+        COMMAND__HAND_SHAKE_BLUETOOTH,
+        COMMAND__LORA_LINK_REQUEST,
+        COMMAND__LORA_LINK_RESULT,
+
+        // --- Data & Telemetry ---
+        COMMAND__SYSTEM_DATA,
+        COMMAND__SYSTEM_DATA_REPORT,
+
+        // --- Actions & Confirmations (Request / Success pairs) ---
+        COMMAND__SET_LIGHT,
+        COMMAND__SET_LIGHT_RESULT,
+
+        COMMAND__SET_SOUND_STATE,
+        COMMAND__SET_SOUND_RESULT,
+
+        COMMAND__SET_HEAT_STATE,
+        COMMAND__SET_HEAT_RESULT,
+
+        // --- Scenarios ---
+        COMMAND__SET_SCENARIO,
+        COMMAND__START_SCENARIO_RESULT,
+
+        // --- Errors & Faults ---
+        COMMAND__GENERAL_ERROR = 0xFE, // דיווח על תקלה כללית (למשל LoRa Timeout)
+        COMMAND__MAX = 0xFF
     } command_e;
 
     typedef struct
