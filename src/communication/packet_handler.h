@@ -17,3 +17,4 @@ typedef struct
 void packet_handler__process(packet_t *received_packet);
 void packet_handler__process_message(const received_packet_message_t *message);
 void process_incoming_packet(packet_t received_packet);
+bool packet_handler__send_packet(packet_source_e destination, command_e command, const uint8_t *payload, uint8_t payload_length);
